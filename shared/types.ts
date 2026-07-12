@@ -2,6 +2,23 @@
 
 /** 従業員（＝Claude Codeのセッション）のステータス */
 export type EmployeeStatus = "working" | "waiting" | "resting";
+
+/**
+ * 職能ロールカテゴリ。使用ツールから自動検出される。
+ * Claude公式プラグインのカテゴリ体系（engineering/marketing/finance等）に準拠。
+ */
+export type EmployeeRole =
+  | "engineering"   // 🔧 GitHub・CI/CD・コーディングツール中心
+  | "marketing"     // 📣 SEO・SNS・広告分析ツール中心
+  | "finance"       // 💹 BigQuery・財務分析ツール中心
+  | "product"       // 🎯 Figma・Amplitude・プロダクト分析ツール中心
+  | "legal"         // ⚖️ DocuSign・Box・契約管理ツール中心
+  | "data"          // 📊 Hex・データ分析ツール中心
+  | "productivity"  // 📋 Linear・Asana・カレンダー中心
+  | "sales"         // 🤝 CRM・営業ツール中心
+  | "research"      // 🔍 ブラウザ・WebSearch中心
+  | "ops"           // ⚙️ インフラ・システム運用中心
+  | "general";      // 👤 未分類・汎用
 // working: ターミナル稼働中でClaudeが出力中（🟢 作業中）
 // waiting: ターミナル稼働中だが5秒以上出力がない＝指示待ち（🟡 返事待ち）
 // resting: ターミナル未接続（⚪ 休憩中）
@@ -25,6 +42,8 @@ export interface Employee {
   progress: string;
   /** セッションが動作しているgitブランチ。取得できなければ空文字 */
   gitBranch: string;
+  /** 使用ツールから自動検出した職能ロールカテゴリ */
+  role: EmployeeRole;
 }
 
 // ---- セッション蒸留（Skill改善候補の自動抽出） ----

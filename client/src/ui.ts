@@ -4,6 +4,36 @@
 
 import type { OfficeState, Department, Employee, UsageInfo, DistillResult } from "../../shared/types";
 
+/** 職能ロールの絵文字（スプライト・モーダル共通） */
+const ROLE_EMOJI: Record<string, string> = {
+  engineering:  "🔧",
+  marketing:    "📣",
+  finance:      "💹",
+  product:      "🎯",
+  legal:        "⚖️",
+  data:         "📊",
+  productivity: "📋",
+  sales:        "🤝",
+  research:     "🔍",
+  ops:          "⚙️",
+  general:      "👤",
+};
+
+/** 職能ロールの日本語ラベル */
+const ROLE_LABEL_JA: Record<string, string> = {
+  engineering:  "エンジニアリング",
+  marketing:    "マーケティング",
+  finance:      "ファイナンス",
+  product:      "プロダクト",
+  legal:        "リーガル",
+  data:         "データ",
+  productivity: "生産性",
+  sales:        "営業",
+  research:     "リサーチ",
+  ops:          "運用",
+  general:      "汎用",
+};
+
 /** DOM要素をIDで取得（存在前提のヘルパ） */
 function byId<T extends HTMLElement = HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -381,10 +411,17 @@ export class UI {
       resting: "⚪ 休憩中",
     };
     byId("emp-status").textContent = statusMap[emp.status] ?? emp.status;
-    byId("emp-role").textContent = emp.title || "（未設定）";
-    byId("emp-branch").textContent = emp.gitBranch
-      ? `${emp.gitBranch}`
-      : "（不明）";
+
+    // 職能ロールバッジ（安全なDOM操作で生成）
+    const roleEl = byId("emp-role");
+    roleEl.textContent = "";
+    const badge = document.createElement("span");
+    badge.className = `role-badge ${emp.role ?? "general"}`;
+    badge.textContent = `${ROLE_EMOJI[emp.role ?? "general"]} ${ROLE_LABEL_JA[emp.role ?? "general"]}`;
+    roleEl.appendChild(badge);
+
+    byId("emp-task").textContent = emp.title || "（未設定）";
+    byId("emp-branch").textContent = emp.gitBranch || "（不明）";
     byId("emp-dept").textContent = dept.name;
     byId("emp-progress").textContent = emp.progress || "（なし）";
     byId("emp-summary").textContent = emp.summary || "（なし）";

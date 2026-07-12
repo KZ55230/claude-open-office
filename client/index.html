@@ -462,6 +462,26 @@
         color: var(--text);
         word-break: break-all;
       }
+      /* 職能ロールバッジ */
+      .role-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: bold;
+        color: #fff;
+      }
+      .role-badge.engineering  { background: #1a3a6f; }
+      .role-badge.marketing    { background: #5b1f80; }
+      .role-badge.finance      { background: #1a5c36; }
+      .role-badge.product      { background: #7a3010; }
+      .role-badge.legal        { background: #2d3748; }
+      .role-badge.data         { background: #0c4a6e; }
+      .role-badge.productivity { background: #713f12; }
+      .role-badge.sales        { background: #7f1d1d; }
+      .role-badge.research     { background: #1e1b4b; }
+      .role-badge.ops          { background: #1e293b; }
+      .role-badge.general      { background: #2a2a3e; color: var(--muted); }
       .emp-summary {
         font-size: 12px;
         color: var(--text);
@@ -747,7 +767,8 @@
           <div class="emp-meta" id="emp-meta-grid">
             <span class="label">名前</span><span class="value" id="emp-name"></span>
             <span class="label">ステータス</span><span class="value" id="emp-status"></span>
-            <span class="label">ロール</span><span class="value" id="emp-role"></span>
+            <span class="label">職能</span><span class="value" id="emp-role"></span>
+            <span class="label">業務内容</span><span class="value" id="emp-task"></span>
             <span class="label">ブランチ</span><span class="value" id="emp-branch"></span>
             <span class="label">部署</span><span class="value" id="emp-dept"></span>
             <span class="label">進捗</span><span class="value" id="emp-progress"></span>

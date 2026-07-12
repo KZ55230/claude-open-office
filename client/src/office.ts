@@ -17,7 +17,7 @@ import {
   Rectangle,
   type FederatedPointerEvent,
 } from "pixi.js";
-import type { Department, Employee, OfficeState } from "../../shared/types";
+import type { Department, Employee, EmployeeRole, OfficeState } from "../../shared/types";
 import { TweenManager, Easings, lerp } from "./tween";
 import {
   charTexture,
@@ -88,6 +88,21 @@ const STATUS_COLORS: Record<Employee["status"], number> = {
   working: 0x6fd08c,
   waiting: 0xf2b134,
   resting: 0xb8bece,
+};
+
+// ロールラベルの背景色（職能カテゴリ別。暗色でテキストが映えるように）
+const ROLE_BG_COLORS: Record<EmployeeRole, number> = {
+  engineering:  0x1a3a6f, // 青
+  marketing:    0x5b1f80, // 紫
+  finance:      0x1a5c36, // 緑
+  product:      0x7a3010, // オレンジ
+  legal:        0x2d3748, // スレート
+  data:         0x0c4a6e, // シアン
+  productivity: 0x713f12, // アンバー
+  sales:        0x7f1d1d, // 赤
+  research:     0x1e1b4b, // インディゴ
+  ops:          0x1e293b, // ダークスレート
+  general:      0x1a1a2e, // デフォルト（暗紺）
 };
 
 /** 席1つ分の描画状態 */
@@ -1171,9 +1186,10 @@ export class OfficeScene {
     const labelW = roleLabelText.width + LABEL_PAD_X * 2;
     const labelH = roleLabelText.height + LABEL_PAD_Y * 2;
     const roleLabelBg = new Graphics();
+    const roleBgColor = ROLE_BG_COLORS[emp.role ?? "general"] ?? 0x1a1a2e;
     roleLabelBg
       .roundRect(-labelW / 2, -labelH / 2, labelW, labelH, 1.5)
-      .fill({ color: 0x1a1a2e, alpha: 0.82 });
+      .fill({ color: roleBgColor, alpha: 0.88 });
     roleLabelText.x = -roleLabelText.width / 2;
     roleLabelText.y = -roleLabelText.height / 2;
     roleLabel.addChild(roleLabelBg);
@@ -1281,7 +1297,8 @@ export class OfficeScene {
       const lw = seat.roleLabelText.width + LABEL_PAD_X * 2;
       const lh = seat.roleLabelText.height + LABEL_PAD_Y * 2;
       bg.clear();
-      bg.roundRect(-lw / 2, -lh / 2, lw, lh, 1.5).fill({ color: 0x1a1a2e, alpha: 0.82 });
+      const roleBgColor = ROLE_BG_COLORS[seat.employee.role ?? "general"] ?? 0x1a1a2e;
+      bg.roundRect(-lw / 2, -lh / 2, lw, lh, 1.5).fill({ color: roleBgColor, alpha: 0.88 });
       seat.roleLabelText.x = -seat.roleLabelText.width / 2;
       seat.roleLabelText.y = -seat.roleLabelText.height / 2;
     }

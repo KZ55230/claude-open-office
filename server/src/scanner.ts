@@ -9,6 +9,7 @@ import type {
   Department,
   DepartmentType,
   Employee,
+  EmployeeRole,
   EmployeeStatus,
   OfficeSettings,
   OfficeState,
@@ -46,6 +47,8 @@ interface RawSession {
   gitBranch: string;
   /** 承認待ち／完了報告の検知結果。どちらでもなければnull */
   speech: SpeechDetectionResult | null;
+  /** 使用ツールから自動検出した職能ロールカテゴリ */
+  role: EmployeeRole;
 }
 
 /**
@@ -101,6 +104,8 @@ function extractSession(filePath: string): RawSession | null {
   const lines = content.split("\n");
   let cwd: string | null = null;
   let gitBranch = "";
+  // セッション全体で使用されたツール名を収集（職能ロールの自動検出に使用）
+  const allToolNames = new Set<string>();
 
   // summary候補（優先度順）:
   //  1) 末尾から遡って type:"summary" 行の summary フィールド
@@ -174,6 +179,7 @@ function extractSession(filePath: string): RawSession | null {
             lastAssistantOnlyText = b.text;
           } else if (b.type === "tool_use" && typeof b.id === "string") {
             pendingToolUses.set(b.id, { name: b.name, input: b.input });
+            if (typeof b.name === "string") allToolNames.add(b.name);
           }
         }
       }
@@ -236,6 +242,7 @@ function extractSession(filePath: string): RawSession | null {
     progress,
     gitBranch,
     speech,
+    role: detectRole(allToolNames),
   };
 
   // 解析結果をキャッシュへ保存（次回スキャンで再利用）
@@ -294,6 +301,47 @@ function describeToolWait(
   return `${pending.size}件のツール実行の承認待ち`;
 }
 
+/**
+ * セッションで使用されたツール名のセットから職能ロールを推定する。
+ * Claude公式プラグインのカテゴリ体系（plugin:category:service）に準拠した命名規則を使用。
+ * MCPツール名は "mcp__plugin_{category}_{service}__*" の形式になるため、
+ * プレフィックスでカテゴリを特定できる。
+ */
+function detectRole(tools: Set<string>): EmployeeRole {
+  const list = [...tools];
+  const hasPrefix = (p: string) => list.some((t) => t.startsWith(p));
+  const hasSub = (s: string) => list.some((t) => t.includes(s));
+
+  // 公式プラグインカテゴリ（mcp__plugin_{category}_*）
+  if (hasPrefix("mcp__plugin_engineering_") || hasSub("_github_github_")) return "engineering";
+  if (hasPrefix("mcp__plugin_marketing_")) return "marketing";
+  if (hasPrefix("mcp__plugin_finance_")) return "finance";
+  if (hasPrefix("mcp__plugin_legal_")) return "legal";
+  if (hasPrefix("mcp__plugin_product-management_") || hasPrefix("mcp__plugin_product_management_")) return "product";
+  if (hasPrefix("mcp__plugin_productivity_")) return "productivity";
+  if (hasPrefix("mcp__plugin_sales_")) return "sales";
+  if (hasPrefix("mcp__plugin_data_")) return "data";
+  // カレンダーMCP（UUID形式のサーバー名でも "calendar" を含む場合）
+  if (hasSub("calendar") && !hasSub("plugin_engineering")) return "productivity";
+
+  // 内蔵ツールのヒューリスティック分類
+  const browserCount = list.filter(
+    (t) =>
+      t.includes("claude-in-chrome") ||
+      t.includes("playwright") ||
+      t === "WebSearch" ||
+      t === "WebFetch"
+  ).length;
+  const codeCount = list.filter((t) =>
+    ["Edit", "Write", "MultiEdit", "Bash", "Read", "Glob", "Grep"].includes(t)
+  ).length;
+
+  if (browserCount > 0 && browserCount > codeCount / 2) return "research";
+  if (codeCount > 0) return "engineering";
+
+  return "general";
+}
+
 /** ディレクトリ内の *.jsonl からRawSession配列を作る */
 function scanProjectDir(dirPath: string): RawSession[] {
   let entries: string[];
@@ -344,6 +392,7 @@ function toEmployee(
     title: raw.title,
     progress: raw.progress,
     gitBranch: raw.gitBranch,
+    role: raw.role,
   };
 }
 
