@@ -1,7 +1,8 @@
-// 新規プロジェクト作成モジュール。~/claude-projects/<name>/CLAUDE.md を生成する。
+// 新規プロジェクト作成モジュール。<projectsRoot>/<name>/CLAUDE.md を生成する。
+// projectsRootはユーザーが設定画面で指定する絶対パス（settings.projectsRoot）。
 import fs from "node:fs";
 import path from "node:path";
-import { CLAUDE_PROJECTS_ROOT, resolveInsideProjectsRoot } from "./paths.js";
+import { resolveInsideProjectsRoot } from "./paths.js";
 
 // プロジェクト名の許可パターン（英数字・アンダースコア・ハイフン、1〜40文字）
 const NAME_PATTERN = /^[a-zA-Z0-9_-]{1,40}$/;
@@ -26,15 +27,24 @@ ${purpose}
 
 /**
  * 新規プロジェクトを作成する。
+ *  - projectsRoot未設定は拒否（設定画面での指定を促す）
  *  - name検証（パターン一致）
- *  - パスが ~/claude-projects 配下に収まるか検証
+ *  - パスが projectsRoot 配下に収まるか検証
  *  - 既存フォルダは拒否
  *  - フォルダ作成 + CLAUDE.md 生成
  */
 export function createProject(
   name: unknown,
-  purpose: unknown
+  purpose: unknown,
+  projectsRoot: string | null
 ): CreateProjectResult {
+  if (!projectsRoot) {
+    return {
+      ok: false,
+      error:
+        "プロジェクトの保存先フォルダが未設定です。このフォームでフォルダを指定してから作成してください。",
+    };
+  }
   if (typeof name !== "string" || !NAME_PATTERN.test(name)) {
     return {
       ok: false,
@@ -44,9 +54,9 @@ export function createProject(
   }
   const purposeText = typeof purpose === "string" ? purpose : "";
 
-  // ~/claude-projects/<name> を組み立て、配下に収まるか検証
-  const target = path.join(CLAUDE_PROJECTS_ROOT, name);
-  const safe = resolveInsideProjectsRoot(target);
+  // <projectsRoot>/<name> を組み立て、配下に収まるか検証
+  const target = path.join(projectsRoot, name);
+  const safe = resolveInsideProjectsRoot(target, projectsRoot);
   if (!safe) {
     return { ok: false, error: "不正なプロジェクトパスです" };
   }

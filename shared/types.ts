@@ -57,6 +57,12 @@ export interface OfficeSettings {
    * リストに無い部署は末尾（ID昇順）に続く。
    */
   roomOrder: string[];
+  /**
+   * 新規プロジェクトの作成先・空フォルダ自動検出の対象フォルダ（絶対パス）。
+   * Claude Code自体には「プロジェクトフォルダの既定値」という概念が無いため、
+   * 未設定（null）が初期値。未設定の間は「新規プロジェクト立案」機能は使えない。
+   */
+  projectsRoot: string | null;
 }
 
 export interface OfficeState {
@@ -79,6 +85,8 @@ export interface UsageInfo {
 // GET  /api/office                  → OfficeState
 // PUT  /api/settings                → body: OfficeSettings、戻り: OfficeState（サーバー側で既存設定とマージ）
 // POST /api/projects                → body: { name: string, purpose: string }、戻り: OfficeState（新部署追加済み）
+//   settings.projectsRoot が未設定（null）の場合は400エラー
+//   （「まずプロジェクトの保存先フォルダを設定してください」という趣旨のエラーメッセージを返す）
 // GET  /api/usage                   → UsageInfo（使用量チェック専用ptyの直近取得結果）
 // POST /api/hire                    → body: { departmentId: string }、戻り: { terminalId: string }
 // POST /api/terminal                → body: { departmentId: string, sessionId: string }、戻り: { terminalId: string }（resume接続）

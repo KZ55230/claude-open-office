@@ -59,7 +59,7 @@ REST/WSの契約は `shared/types.ts` のコメント参照。実装モジュー
 - `scanner.ts`: `~/.claude/projects` の走査 → OfficeState構築。chokidarで `*.jsonl` を監視して差分更新
 - `terminal.ts`: pty管理。`claude --resume <sessionId>` をその部署のcwdで起動（env: TERM=xterm-256color）。terminalId(UUID)→ptyのMap。**出力リングバッファ（最大200KB）**を保持し、WS再接続時に再生。WSが切れてもptyは生かす（従業員は裏で働き続ける）。DELETE時のみkill
 - **hire（新規雇用）**: `claude`（引数なし）をcwdで起動。chokidarがそのプロジェクトdirに新しい.jsonlを検知したら、terminalIdとsessionIdを紐づけ、WSへ `sessionBound` を送る
-- `projects.ts`: 新規プロジェクト作成。name検証（`[a-zA-Z0-9_-]{1,40}`、既存フォルダ拒否）。`~/claude-projects/<name>/CLAUDE.md` を生成。テンプレート:
+- `projects.ts`: 新規プロジェクト作成。name検証（`[a-zA-Z0-9_-]{1,40}`、既存フォルダ拒否）。`settings.projectsRoot`（ユーザー設定の絶対パス。未設定なら作成不可としてエラーを返す）の配下に`<name>/CLAUDE.md` を生成。テンプレート:
 
 ```markdown
 # <name>
@@ -73,7 +73,7 @@ REST/WSの契約は `shared/types.ts` のコメント参照。実装モジュー
 ```
 
 - `settings.ts`: `config/settings.json` の読み書き（無ければデフォルト生成）
-- セキュリティ: 127.0.0.1のみバインド。パス操作は必ず正規化して `~/claude-projects` 配下かを検証
+- セキュリティ: 127.0.0.1のみバインド。パス操作は必ず正規化して `settings.projectsRoot` 配下かを検証（`resolveInsideProjectsRoot`）。`projectsRoot`自体は`normalizeProjectsRoot`で絶対パスであることを検証し、保存時にフォルダを自動作成する
 
 ## クライアント仕様（担当B）
 

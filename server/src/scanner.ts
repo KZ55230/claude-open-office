@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import chokidar, { type FSWatcher } from "chokidar";
-import { CLAUDE_PROJECTS_DIR, CLAUDE_PROJECTS_ROOT } from "./paths.js";
+import { CLAUDE_PROJECTS_DIR } from "./paths.js";
 import { nameFromSessionId, spriteSeedFromSessionId } from "./names.js";
 import { loadSettings, saveSettings } from "./settings.js";
 import type {
@@ -436,18 +436,20 @@ export function buildOfficeState(live: LiveStatusProvider): OfficeState {
   }
 
   // セッション履歴がまだ無い実プロジェクトフォルダも空部署として追加する
-  // （POST /api/projects 直後のフォルダ等。~/claude-projects 直下1階層のみ走査）。
+  // （POST /api/projects 直後のフォルダ等。settings.projectsRoot 直下1階層のみ走査。
+  //   未設定の間はこの機能自体をスキップする）
   const knownCwds = new Set(
     departments.map((d) => d.cwd).filter((c) => c.length > 0)
   );
   try {
-    const rootEntries = fs.readdirSync(CLAUDE_PROJECTS_ROOT, {
+    if (!settings.projectsRoot) throw new Error("projectsRoot未設定");
+    const rootEntries = fs.readdirSync(settings.projectsRoot, {
       withFileTypes: true,
     });
     for (const entry of rootEntries) {
       // 隠しフォルダ（.始まり）とディレクトリ以外はスキップ
       if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
-      const cwd = path.join(CLAUDE_PROJECTS_ROOT, entry.name);
+      const cwd = path.join(settings.projectsRoot, entry.name);
       if (knownCwds.has(cwd)) continue;
       departments.push(
         buildDepartment(
@@ -462,7 +464,7 @@ export function buildOfficeState(live: LiveStatusProvider): OfficeState {
       );
     }
   } catch {
-    // ~/claude-projects が読めなくても致命的ではない
+    // projectsRoot未設定・読めない、のいずれでも致命的ではない（単にスキップ）
   }
 
   // 部署の並び順をID（名前）で固定する。
@@ -488,6 +490,7 @@ export function buildOfficeState(live: LiveStatusProvider): OfficeState {
       departmentAliases: {},
       employeeNotes: {},
       roomOrder: [],
+      projectsRoot: null,
     };
     // 初期設定を永続化しておく（次回以降はexisted=trueになる）
     saveSettings(effectiveSettings);

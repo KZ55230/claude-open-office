@@ -142,6 +142,7 @@ class App {
       departmentAliases: cur?.departmentAliases ?? {},
       employeeNotes: cur?.employeeNotes ?? {},
       roomOrder: cur?.roomOrder ?? [],
+      projectsRoot: cur?.projectsRoot ?? null,
       ...partial,
     };
   }
@@ -298,7 +299,13 @@ class App {
     };
 
     // 新規プロジェクト作成
-    this.ui.onCreateProject = async (name, purpose) => {
+    this.ui.onCreateProject = async (name, purpose, projectsRoot) => {
+      // 保存先フォルダを先に保存（サーバー側で絶対パス検証＋フォルダ自動作成）。
+      // 失敗時はここでthrowし、UI側のエラー表示にそのまま流れる。
+      if (projectsRoot !== (this.latestState?.settings.projectsRoot ?? null)) {
+        const saved = await putSettings(this.mergedSettings({ projectsRoot }));
+        this.applyStateFromRest(saved);
+      }
       const state = await createProject(name, purpose);
       this.applyStateFromRest(state);
     };

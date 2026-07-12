@@ -12,6 +12,7 @@ function defaultSettings(): OfficeSettings {
     departmentAliases: {},
     employeeNotes: {},
     roomOrder: [],
+    projectsRoot: null,
   };
 }
 
@@ -51,6 +52,8 @@ export function loadSettings(): { settings: OfficeSettings; existed: boolean } {
         departmentAliases: asStringRecord(parsed.departmentAliases),
         employeeNotes: asStringRecord(parsed.employeeNotes),
         roomOrder: asStringArray(parsed.roomOrder),
+        projectsRoot:
+          typeof parsed.projectsRoot === "string" ? parsed.projectsRoot : null,
       },
       existed: true,
     };

@@ -14,7 +14,11 @@ function byId<T extends HTMLElement = HTMLElement>(id: string): T {
 /** UI全体を束ねるコントローラ。コールバックはmain.tsから差し込む */
 export class UI {
   // コールバック
-  onCreateProject?: (name: string, purpose: string) => Promise<void>;
+  onCreateProject?: (
+    name: string,
+    purpose: string,
+    projectsRoot: string
+  ) => Promise<void>;
   onSaveVisibility?: (visibleIds: string[]) => Promise<void>;
   onRecallAlumni?: (dept: Department, emp: Employee) => Promise<void>;
   onRetry?: () => void;
@@ -89,6 +93,8 @@ export class UI {
   // ---- 新規プロジェクト立案モーダル ----
 
   private openProjectModal(): void {
+    // 保存先フォルダは前回設定した値を自動で入れておく（未設定なら空欄）
+    byId<HTMLInputElement>("proj-root").value = this.state?.settings.projectsRoot ?? "";
     byId<HTMLInputElement>("proj-name").value = "";
     byId<HTMLTextAreaElement>("proj-purpose").value = "";
     byId("proj-error").textContent = "";
@@ -97,10 +103,15 @@ export class UI {
 
   private wireProjectForm(): void {
     byId("proj-submit").addEventListener("click", async () => {
+      const projectsRoot = byId<HTMLInputElement>("proj-root").value.trim();
       const name = byId<HTMLInputElement>("proj-name").value.trim();
       const purpose = byId<HTMLTextAreaElement>("proj-purpose").value.trim();
       const errEl = byId("proj-error");
-      // クライアント側でも軽く検証（サーバー契約と同じ規則）
+      // 絶対パスかどうかの厳密な判定はサーバー側で行う（Windows等のパス形式にも対応するため）
+      if (!projectsRoot) {
+        errEl.textContent = "保存先フォルダを指定してください（例: /home/you/projects）。";
+        return;
+      }
       if (!/^[a-zA-Z0-9_-]{1,40}$/.test(name)) {
         errEl.textContent = "プロジェクト名は英数字・ハイフン・アンダースコア（1〜40文字）で入力してください。";
         return;
@@ -111,7 +122,7 @@ export class UI {
       }
       errEl.textContent = "作成中…";
       try {
-        await this.onCreateProject?.(name, purpose);
+        await this.onCreateProject?.(name, purpose, projectsRoot);
         this.closeModal("modal-project");
       } catch (e) {
         errEl.textContent = e instanceof Error ? e.message : "作成に失敗しました。";

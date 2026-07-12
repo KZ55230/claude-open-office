@@ -16,6 +16,7 @@ import {
 import { TerminalManager, type SessionStatus } from "./terminal.js";
 import { createProject } from "./projects.js";
 import { loadSettings, saveSettings } from "./settings.js";
+import { normalizeProjectsRoot } from "./paths.js";
 import { appendCustomTitle } from "./rename.js";
 import { UsageMonitor } from "./usageMonitor.js";
 import type {
@@ -62,9 +63,40 @@ app.get("/api/office", (_req, res) => {
 
 // PUT /api/settings → OfficeSettingsを保存し、更新後のOfficeStateを返す。
 // 既存設定とマージして保存する（クライアントが知らない新フィールドの消失を防ぐ）。
+// projectsRootのみ、他フィールドと異なり不正値は400で拒否する（ユーザーが
+// 「新規プロジェクト立案」フォームで明示的に入力する値のため、無言でのフォール
+// バックより明確なエラーの方が親切）。未指定（キー無し）なら既存値を維持。
 app.put("/api/settings", (req, res) => {
   const body = req.body as Partial<OfficeSettings>;
   const { settings: existing } = loadSettings();
+
+  let projectsRoot = existing.projectsRoot;
+  if (Object.prototype.hasOwnProperty.call(body, "projectsRoot")) {
+    if (body.projectsRoot === null) {
+      projectsRoot = null;
+    } else if (typeof body.projectsRoot === "string") {
+      const normalized = normalizeProjectsRoot(body.projectsRoot);
+      if (!normalized) {
+        res.status(400).json({
+          error: "保存先フォルダは絶対パスで指定してください（例: /home/you/projects）",
+        });
+        return;
+      }
+      try {
+        fs.mkdirSync(normalized, { recursive: true });
+      } catch (e) {
+        res.status(400).json({
+          error: `保存先フォルダを作成できませんでした: ${(e as Error).message}`,
+        });
+        return;
+      }
+      projectsRoot = normalized;
+    } else {
+      res.status(400).json({ error: "保存先フォルダの指定が不正です" });
+      return;
+    }
+  }
+
   const settings: OfficeSettings = {
     visibleDepartments: Array.isArray(body.visibleDepartments)
       ? body.visibleDepartments
@@ -81,6 +113,7 @@ app.put("/api/settings", (req, res) => {
     roomOrder: isStringArray(body.roomOrder)
       ? body.roomOrder
       : existing.roomOrder,
+    projectsRoot,
   };
   saveSettings(settings);
   const state = currentState();
@@ -92,14 +125,14 @@ app.put("/api/settings", (req, res) => {
 // POST /api/projects → 新規プロジェクト作成、更新後のOfficeStateを返す
 app.post("/api/projects", (req, res) => {
   const { name, purpose } = req.body ?? {};
-  const result = createProject(name, purpose);
+  const { settings } = loadSettings();
+  const result = createProject(name, purpose, settings.projectsRoot);
   if (!result.ok) {
     res.status(400).json({ error: result.error });
     return;
   }
   // 新規部署を表示ONにする（settings.jsonのvisibleに追加）
   try {
-    const { settings } = loadSettings();
     const deptId = result.cwd.replace(/\//g, "-");
     if (!settings.visibleDepartments.includes(deptId)) {
       settings.visibleDepartments.push(deptId);
