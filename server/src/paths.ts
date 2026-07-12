@@ -1,4 +1,5 @@
 // パス関連のユーティリティとセキュリティ検証をまとめたモジュール
+import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -22,6 +23,30 @@ export const SETTINGS_FILE = path.join(
   "config",
   "settings.json"
 );
+
+/**
+ * claude CLI の実行ファイルパスを解決する。
+ * Windows では node-pty が PATHEXT を解決しないため、
+ * PATH 上の各ディレクトリを走査して claude.exe / claude.cmd を探す。
+ * 見つからなければフォールバックとして "claude" を返す（Mac/Linux 用）。
+ */
+export function resolveCaudeBin(): string {
+  if (process.platform !== "win32") return "claude";
+  const pathDirs = (process.env.PATH ?? "").split(path.delimiter);
+  const candidates = ["claude.exe", "claude.cmd", "claude.bat"];
+  for (const dir of pathDirs) {
+    for (const name of candidates) {
+      const full = path.join(dir, name);
+      try {
+        fs.accessSync(full, fs.constants.X_OK);
+        return full;
+      } catch {
+        // 次を試す
+      }
+    }
+  }
+  return "claude";
+}
 
 /**
  * 与えられたパスが projectsRoot 配下に収まっているかを検証する。

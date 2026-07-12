@@ -7,7 +7,7 @@
 // 新規セッション作成も一切発生しないことを実機検証済み）。
 import * as pty from "@lydell/node-pty";
 import { buildChildEnv } from "./childEnv.js";
-import { USAGE_PROBE_CWD } from "./paths.js";
+import { resolveCaudeBin, USAGE_PROBE_CWD } from "./paths.js";
 import type { UsageInfo } from "../../shared/types.js";
 
 const POLL_INTERVAL_MS = 90_000; // /usageを送る間隔
@@ -87,7 +87,7 @@ export class UsageMonitor {
 
   private spawn(): void {
     try {
-      this.proc = pty.spawn("claude", [], {
+      this.proc = pty.spawn(resolveCaudeBin(), [], {
         name: "xterm-256color",
         cols: 100,
         rows: 40,

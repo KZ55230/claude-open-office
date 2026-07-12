@@ -133,7 +133,7 @@ app.post("/api/projects", (req, res) => {
   }
   // 新規部署を表示ONにする（settings.jsonのvisibleに追加）
   try {
-    const deptId = result.cwd.replace(/\//g, "-");
+    const deptId = result.cwd.replace(/[/\\:]/g, "-");
     if (!settings.visibleDepartments.includes(deptId)) {
       settings.visibleDepartments.push(deptId);
       saveSettings(settings);
@@ -158,8 +158,13 @@ app.post("/api/hire", (req, res) => {
     res.status(400).json({ error: "部署が見つかりません" });
     return;
   }
-  const terminalId = terminals.hire(cwd);
-  res.json({ terminalId });
+  try {
+    const terminalId = terminals.hire(cwd);
+    res.json({ terminalId });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: `claude の起動に失敗しました: ${msg}` });
+  }
 });
 
 // POST /api/terminal → body:{departmentId, sessionId} resume接続、terminalIdを返す
@@ -174,8 +179,13 @@ app.post("/api/terminal", (req, res) => {
     res.status(400).json({ error: "部署が見つかりません" });
     return;
   }
-  const terminalId = terminals.resume(cwd, sessionId);
-  res.json({ terminalId });
+  try {
+    const terminalId = terminals.resume(cwd, sessionId);
+    res.json({ terminalId });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: `claude の起動に失敗しました: ${msg}` });
+  }
 });
 
 // DELETE /api/terminal/:terminalId → ptyを終了（退勤）

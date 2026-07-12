@@ -8,6 +8,7 @@ import type {
   TermServerMessage,
 } from "../../shared/types.js";
 import { buildChildEnv } from "./childEnv.js";
+import { resolveCaudeBin } from "./paths.js";
 
 // 出力リングバッファの最大サイズ（64KB。再接続時の再生用）
 const RING_BUFFER_MAX = 64 * 1024;
@@ -19,8 +20,8 @@ const BATCH_INTERVAL_MS = 16;
 const BATCH_FLUSH_SIZE = 32 * 1024;
 // 再接続時の再生を分割送信するチャンクサイズ
 const REPLAY_CHUNK_SIZE = 16 * 1024;
-// claude CLI の実行パス（PATH上にあるが絶対パスでも動く）
-const CLAUDE_BIN = "claude";
+// claude CLI の実行パス（Windows では .exe/.cmd を解決する）
+const CLAUDE_BIN = resolveCaudeBin();
 // /clear等で同一ptyのsessionIdが変わった際、直近この時間内に出力があった
 // bind済み端末を「セッション遷移した本人」とみなして再割り当てする猶予時間
 const REBIND_WINDOW_MS = 10000;

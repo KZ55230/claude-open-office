@@ -514,8 +514,9 @@ export function detectSpeechSignal(filePath: string): SpeechDetectionResult | nu
 
 /** 実フォルダパスから仮想部署IDを作る（エンコード済みディレクトリ名に合わせる） */
 function virtualDeptId(cwd: string): string {
-  // ~/.claude/projects のエンコード規則（/ を - に置換）に合わせたID
-  return cwd.replace(/\//g, "-");
+  // ~/.claude/projects のエンコード規則に合わせたID
+  // Windows では \ と : も - に置換（例: D:\foo → D--foo）
+  return cwd.replace(/[/\\:]/g, "-");
 }
 
 /** chokidarのイベント種別 */

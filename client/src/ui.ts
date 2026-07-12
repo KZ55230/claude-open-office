@@ -88,6 +88,20 @@ export class UI {
       );
       byId("modal-backdrop").classList.remove("open");
     });
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      // エラーオーバーレイが開いていれば閉じる
+      const overlay = byId("error-overlay");
+      if (overlay.classList.contains("open")) {
+        this.hideError();
+        return;
+      }
+      // 通常モーダルを閉じる
+      document.querySelectorAll<HTMLElement>(".modal.open").forEach((m) =>
+        m.classList.remove("open")
+      );
+      byId("modal-backdrop").classList.remove("open");
+    });
   }
 
   // ---- 新規プロジェクト立案モーダル ----
@@ -359,6 +373,9 @@ export class UI {
     byId("error-retry").addEventListener("click", () => {
       this.hideError();
       this.onRetry?.();
+    });
+    byId("error-close").addEventListener("click", () => {
+      this.hideError();
     });
   }
 
