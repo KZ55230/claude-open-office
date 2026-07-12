@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Claude Office - 仮想オフィス</title>
+    <style>
+      /* ダークトーンのレトロゲーム風スタイル。等幅フォントでドット絵UIと統一 */
+      :root {
+        --bg: #12121a;
+        --panel: #1c1c28;
+        --panel-2: #23233a;
+        --border: #3a3a4a;
+        --text: #d0d0e0;
+        --muted: #9a9aae;
+        --accent: #7fe0a0;
+        --accent-yellow: #e8c020;
+        --danger: #e8703a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "DejaVu Sans Mono", "Courier New", monospace;
+        image-rendering: pixelated;
+      }
+      #app {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+      }
+      /* ヘッダー下の作業領域：オフィス（左）とターミナルドック（右）の横並び */
+      #workspace {
+        position: absolute;
+        /* ヘッダー（48px）の下に配置する */
+        inset: 48px 0 0 0;
+        display: flex;
+      }
+      /* Pixiキャンバスの土台（ドックの分だけ縮む） */
+      #office-mount {
+        position: relative;
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+      }
+      #office-mount canvas {
+        display: block;
+      }
+
+      /* ---- ターミナルドック（右側・0〜2面の可変表示） ---- */
+      #terminal-dock {
+        flex: 0 0 40%;
+        max-width: 40%;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 8px;
+        background: #0e0e16;
+        border-left: 2px solid var(--border);
+        overflow: hidden;
+        transition:
+          flex-basis 0.25s ease,
+          max-width 0.25s ease,
+          padding 0.25s ease,
+          border-left-width 0.25s ease;
+      }
+      /* 接続中の面が0のときはドックごと隠す（オフィスが100%幅） */
+      #terminal-dock.panes-0 {
+        flex-basis: 0;
+        max-width: 0;
+        padding: 0;
+        border-left-width: 0;
+      }
+      /* 面：1面なら高さ100%、2面なら上下50%ずつ（flexが自動で分配） */
+      .term-pane {
+        flex: 1 1 50%;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        background: #12121a;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      .term-pane.hidden {
+        display: none;
+      }
+      .pane-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        background: var(--panel-2);
+        border-bottom: 1px solid var(--border);
+        flex: 0 0 auto;
+      }
+      .pane-name {
+        font-size: 12px;
+        color: var(--accent);
+        font-weight: bold;
+        white-space: nowrap;
+      }
+      .pane-session {
+        flex: 1;
+        font-size: 11px;
+        color: var(--muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .pane-btn {
+        background: none;
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        color: var(--muted);
+        font-family: inherit;
+        font-size: 11px;
+        padding: 2px 7px;
+        cursor: pointer;
+      }
+      .pane-btn:hover {
+        color: var(--text);
+        background: #2e2e46;
+      }
+      .pane-body {
+        flex: 1;
+        min-height: 0;
+        padding: 4px;
+      }
+
+      /* ---- ヘッダー ---- */
+      header#topbar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 14px;
+        background: linear-gradient(180deg, #23233a, #1a1a28);
+        border-bottom: 2px solid var(--border);
+        z-index: 20;
+      }
+      header#topbar .title {
+        font-weight: bold;
+        font-size: 16px;
+        color: var(--accent);
+        letter-spacing: 1px;
+        text-shadow: 0 1px 0 #000;
+      }
+      header#topbar .spacer {
+        flex: 1;
+      }
+      .btn {
+        background: var(--panel-2);
+        color: var(--text);
+        border: 2px solid var(--border);
+        border-radius: 4px;
+        padding: 6px 12px;
+        font-family: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        box-shadow: 0 2px 0 #000;
+      }
+      .btn:hover {
+        background: #2e2e46;
+      }
+      .btn:active {
+        transform: translateY(2px);
+        box-shadow: none;
+      }
+      .btn-small {
+        background: var(--panel-2);
+        color: var(--accent);
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        padding: 4px 10px;
+        font-family: inherit;
+        font-size: 11px;
+        cursor: pointer;
+      }
+      .btn-small:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      /* 使用量表示（接続ドットの隣） */
+      .usage-info {
+        font-size: 11px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      /* 接続状態ドット */
+      #conn-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--muted);
+      }
+      #conn-dot.connected {
+        background: var(--accent);
+        box-shadow: 0 0 6px var(--accent);
+      }
+      #conn-dot.disconnected {
+        background: var(--danger);
+      }
+
+      /* ---- モーダル ---- */
+      #modal-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 30;
+        display: none;
+      }
+      #modal-backdrop.open {
+        display: block;
+      }
+      .modal {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) scale(0.96);
+        background: var(--panel);
+        border: 2px solid var(--border);
+        border-radius: 6px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+        z-index: 40;
+        display: none;
+        min-width: 360px;
+        max-width: 90vw;
+        max-height: 86vh;
+        overflow: auto;
+      }
+      .modal.open {
+        display: block;
+        animation: modal-in 0.15s ease-out forwards;
+      }
+      @keyframes modal-in {
+        to {
+          transform: translate(-50%, -50%) scale(1);
+        }
+      }
+      .modal .modal-head {
+        display: flex;
+        align-items: center;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+        background: var(--panel-2);
+      }
+      .modal .modal-head h2 {
+        margin: 0;
+        font-size: 14px;
+        color: var(--accent);
+      }
+      .modal .modal-head .spacer {
+        flex: 1;
+      }
+      .modal .close-x {
+        background: none;
+        border: none;
+        color: var(--muted);
+        font-size: 18px;
+        cursor: pointer;
+      }
+      .modal .modal-body {
+        padding: 14px;
+      }
+      .field {
+        margin-bottom: 12px;
+      }
+      .field label {
+        display: block;
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+      .field input,
+      .field textarea {
+        width: 100%;
+        background: #14141c;
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 8px;
+        font-family: inherit;
+        font-size: 13px;
+      }
+      .field textarea {
+        min-height: 80px;
+        resize: vertical;
+      }
+      .error-text {
+        color: var(--danger);
+        font-size: 12px;
+        min-height: 16px;
+        margin-top: 6px;
+      }
+      .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      /* 表示選択のチェック行 */
+      .check-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 4px;
+        font-size: 13px;
+        border-bottom: 1px solid #2a2a34;
+        cursor: pointer;
+      }
+      .check-row input {
+        accent-color: var(--accent);
+      }
+
+      /* OB名簿の行 */
+      .alumni-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 4px;
+        border-bottom: 1px solid #2a2a34;
+      }
+      .alumni-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        font-size: 12px;
+      }
+      .alumni-info strong {
+        color: var(--text);
+      }
+      .alumni-dept {
+        color: var(--accent-yellow);
+        font-size: 11px;
+      }
+      .alumni-sum {
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .empty-note {
+        color: var(--muted);
+        font-size: 12px;
+        text-align: center;
+        padding: 20px;
+      }
+
+      /* ---- ツールチップ（掲示板・従業員ホバー） ---- */
+      #tooltip {
+        position: absolute;
+        z-index: 50;
+        max-width: 280px;
+        background: #14141c;
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 6px 8px;
+        font-size: 11px;
+        pointer-events: none;
+        display: none;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+      }
+      #tooltip.open {
+        display: block;
+      }
+      /* リッチツールチップ（従業員ホバー）の中身 */
+      #tooltip .tip-name {
+        font-size: 12px;
+        font-weight: bold;
+        color: var(--accent);
+        margin-bottom: 2px;
+      }
+      #tooltip .tip-session {
+        font-size: 11px;
+        color: var(--accent-yellow);
+        margin-bottom: 4px;
+      }
+      #tooltip .tip-label {
+        font-size: 10px;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+      #tooltip .tip-body {
+        font-size: 11px;
+        color: var(--text);
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      /* ---- エラーオーバーレイ（リトライ） ---- */
+      #error-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 60;
+        background: rgba(10, 10, 16, 0.9);
+        display: none;
+        align-items: center;
+        justify-content: center;
+      }
+      #error-overlay.open {
+        display: flex;
+      }
+      .error-box {
+        background: var(--panel);
+        border: 2px solid var(--danger);
+        border-radius: 8px;
+        padding: 24px 28px;
+        text-align: center;
+        max-width: 480px;
+      }
+      .error-box h2 {
+        color: var(--danger);
+        font-size: 16px;
+        margin: 0 0 10px;
+      }
+      #error-message {
+        color: var(--text);
+        font-size: 13px;
+        white-space: pre-line;
+        margin-bottom: 16px;
+      }
+
+      /* ヒント表示（操作説明） */
+      #hint {
+        position: absolute;
+        left: 12px;
+        bottom: 10px;
+        z-index: 15;
+        font-size: 11px;
+        color: var(--muted);
+        background: rgba(20, 20, 28, 0.7);
+        padding: 4px 8px;
+        border-radius: 4px;
+        pointer-events: none;
+      }
+
+      /* 模様替えボタンのアクティブ表示 */
+      #btn-rearrange.active {
+        background: #274232;
+        border-color: var(--accent);
+        color: var(--accent);
+        box-shadow: 0 0 6px rgba(127, 224, 160, 0.35);
+      }
+      /* 模様替えモードのガイド（画面下中央の小さな帯） */
+      #rearrange-guide {
+        position: absolute;
+        left: 50%;
+        bottom: 14px;
+        transform: translateX(-50%);
+        z-index: 16;
+        max-width: 80vw;
+        font-size: 12px;
+        color: var(--accent);
+        background: rgba(20, 28, 22, 0.92);
+        border: 1px solid var(--accent);
+        border-radius: 6px;
+        padding: 6px 12px;
+        pointer-events: none;
+        display: none;
+      }
+      #rearrange-guide.open {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <!-- 作業領域：オフィス（左）＋ターミナルドック（右・可変表示） -->
+      <div id="workspace">
+        <!-- Pixiキャンバスの土台 -->
+        <div id="office-mount"></div>
+
+        <!-- ターミナルドック（接続0面のときは非表示） -->
+        <div id="terminal-dock" class="panes-0">
+          <div class="term-pane hidden" id="term-pane-0">
+            <div class="pane-head">
+              <span class="pane-name"></span>
+              <span class="pane-session"></span>
+              <button class="pane-btn pane-karte" title="従業員カルテ">✎</button>
+              <button class="pane-btn pane-close" title="面を閉じる（セッションは継続）">✕</button>
+            </div>
+            <div class="pane-body"></div>
+          </div>
+          <div class="term-pane hidden" id="term-pane-1">
+            <div class="pane-head">
+              <span class="pane-name"></span>
+              <span class="pane-session"></span>
+              <button class="pane-btn pane-karte" title="従業員カルテ">✎</button>
+              <button class="pane-btn pane-close" title="面を閉じる（セッションは継続）">✕</button>
+            </div>
+            <div class="pane-body"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ヘッダー -->
+      <header id="topbar">
+        <span class="title">🏢 Claude Office</span>
+        <button class="btn" id="btn-new-project">新規プロジェクト立案</button>
+        <button class="btn" id="btn-visibility">表示プロジェクト選択</button>
+        <button class="btn" id="btn-alumni">OB名簿</button>
+        <button class="btn" id="btn-rearrange">模様替え</button>
+        <span class="spacer"></span>
+        <span id="usage-info" class="usage-info" title=""></span>
+        <span id="conn-dot" class="disconnected" title="サーバー未接続"></span>
+      </header>
+
+      <!-- 操作ヒント -->
+      <div id="hint">ホイール：ズーム／ドラッグ：移動／従業員クリック：ターミナル</div>
+
+      <!-- 模様替えモードのガイド -->
+      <div id="rearrange-guide">
+        🏠 模様替え中：部屋をドラッグして別の部屋と入れ替え／「模様替え」をもう一度押して終了（投資部・マーケティング部は固定）
+      </div>
+
+      <!-- ツールチップ -->
+      <div id="tooltip"></div>
+
+      <!-- モーダル背景 -->
+      <div id="modal-backdrop"></div>
+
+      <!-- 新規プロジェクト立案モーダル -->
+      <div class="modal" id="modal-project">
+        <div class="modal-head">
+          <h2>新規プロジェクト立案</h2>
+          <span class="spacer"></span>
+          <button class="close-x" data-close="modal-project">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="field">
+            <label for="proj-name">プロジェクト名（英数字・ハイフン・アンダースコア、1〜40文字）</label>
+            <input id="proj-name" type="text" placeholder="例: my-project" />
+          </div>
+          <div class="field">
+            <label for="proj-purpose">プロジェクトの目的</label>
+            <textarea id="proj-purpose" placeholder="このプロジェクトで達成したいことを書いてください"></textarea>
+          </div>
+          <div class="error-text" id="proj-error"></div>
+          <div class="modal-actions">
+            <button class="btn" data-close="modal-project">キャンセル</button>
+            <button class="btn" id="proj-submit">作成する</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 表示プロジェクト選択モーダル -->
+      <div class="modal" id="modal-visibility">
+        <div class="modal-head">
+          <h2>表示プロジェクト選択</h2>
+          <span class="spacer"></span>
+          <button class="close-x" data-close="modal-visibility">✕</button>
+        </div>
+        <div class="modal-body">
+          <div id="visibility-list"></div>
+          <div class="error-text" id="visibility-error"></div>
+          <div class="modal-actions">
+            <button class="btn" data-close="modal-visibility">キャンセル</button>
+            <button class="btn" id="visibility-save">保存する</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- OB名簿モーダル -->
+      <div class="modal" id="modal-alumni">
+        <div class="modal-head">
+          <h2>OB名簿</h2>
+          <span class="spacer"></span>
+          <button class="close-x" data-close="modal-alumni">✕</button>
+        </div>
+        <div class="modal-body">
+          <div id="alumni-list"></div>
+        </div>
+      </div>
+
+      <!-- 部署名の変更モーダル（プレートクリック） -->
+      <div class="modal" id="modal-dept-alias">
+        <div class="modal-head">
+          <h2>部署名の変更</h2>
+          <span class="spacer"></span>
+          <button class="close-x" data-close="modal-dept-alias">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="field">
+            <label id="alias-current"></label>
+            <input id="alias-input" type="text" placeholder="表示したい部署名（空にすると元の名前に戻ります）" />
+          </div>
+          <p class="empty-note" style="text-align: left; padding: 0 0 8px">
+            ※ 表示上の名前だけが変わります。実際のフォルダ名は変更されません。
+          </p>
+          <div class="error-text" id="alias-error"></div>
+          <div class="modal-actions">
+            <button class="btn" data-close="modal-dept-alias">キャンセル</button>
+            <button class="btn" id="alias-save">保存する</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 従業員カルテモーダル（セッション名変更＋メモ） -->
+      <div class="modal" id="modal-karte">
+        <div class="modal-head">
+          <h2>従業員カルテ</h2>
+          <span class="spacer"></span>
+          <button class="close-x" data-close="modal-karte">✕</button>
+        </div>
+        <div class="modal-body">
+          <p id="karte-who" style="margin: 0 0 10px; font-size: 13px"></p>
+          <div class="field">
+            <label for="karte-title">セッション名（作業に名前を付けて見分けやすくします）</label>
+            <input id="karte-title" type="text" placeholder="例: ログイン画面の実装" />
+          </div>
+          <div class="field">
+            <label for="karte-note">メモ（手動。ホバーのツールチップに追加表示されます。進捗は自動表示されます）</label>
+            <textarea id="karte-note" placeholder="例: レビュー待ち。明日マージ予定"></textarea>
+          </div>
+          <div class="error-text" id="karte-error"></div>
+          <div class="modal-actions">
+            <button class="btn" data-close="modal-karte">キャンセル</button>
+            <button class="btn" id="karte-save">保存する</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- エラーオーバーレイ -->
+      <div id="error-overlay">
+        <div class="error-box">
+          <h2>⚠ 接続エラー</h2>
+          <div id="error-message"></div>
+          <button class="btn" id="error-retry">再接続する</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
