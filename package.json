@@ -14,7 +14,7 @@
     "build": "vite build && tsc -p server/tsconfig.json --noEmit",
     "typecheck": "tsc -p server/tsconfig.json --noEmit && tsc -p client/tsconfig.json --noEmit",
     "test:layout": "node --experimental-strip-types client/src/layout.test.ts",
-    "start": "NODE_ENV=production tsx server/src/index.ts"
+    "start": "cross-env NODE_ENV=production tsx server/src/index.ts"
   },
   "dependencies": {
     "@lydell/node-pty": "^1.1.0",
@@ -30,6 +30,7 @@
     "@xterm/addon-webgl": "^0.18.0",
     "@xterm/xterm": "^5.5.0",
     "concurrently": "^9.1.0",
+    "cross-env": "^10.1.0",
     "pixi.js": "^8.6.6",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
