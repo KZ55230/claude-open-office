@@ -23,6 +23,25 @@ export interface Employee {
   title: string;
   /** 直近のassistant発言から自動抽出した進捗（現在何をしている/したか）。無ければ空文字 */
   progress: string;
+  /** セッションが動作しているgitブランチ。取得できなければ空文字 */
+  gitBranch: string;
+}
+
+// ---- セッション蒸留（Skill改善候補の自動抽出） ----
+
+export interface DistillResult {
+  sessionId: string;
+  title: string;
+  gitBranch: string;
+  summary: string;
+  /** 使用されたツール名の一覧（重複除去・使用頻度の高い順） */
+  toolsUsed: string[];
+  /** Read/Edit/Write等で参照されたファイルパス（重複除去） */
+  filesReferenced: string[];
+  /** 注目すべきassistant発言の抜粋（最大3件） */
+  keyDecisions: string[];
+  /** .claude/skills/ に追記できるMarkdownテンプレート */
+  skillTemplate: string;
 }
 
 export type DepartmentType = "project";
@@ -95,6 +114,7 @@ export interface UsageInfo {
 // PUT  /api/employees/:sessionId/note       → body: { note: string }（空文字で解除）、戻り: OfficeState
 // POST /api/sessions/:sessionId/title       → body: { departmentId: string, title: string }、戻り: { ok: true }
 //   （~/.claude/projects/<departmentId>/<sessionId>.jsonl へ custom-title 行を追記する。append専用）
+// GET  /api/sessions/:sessionId/distill?departmentId=... → DistillResult（Skill改善候補の抽出）
 
 // ---- WebSocket ----
 // /ws/office : サーバー→クライアントへOfficeStateの更新を配信

@@ -15,6 +15,7 @@ import {
   putDepartmentAlias,
   putEmployeeNote,
   renameSession,
+  distillSession,
   OfficeSocket,
   type StatusUpdate,
 } from "./api";
@@ -199,25 +200,10 @@ class App {
   // ---- シーン（Pixi）→アプリのコールバック ----
 
   private wireScene(): void {
-    // 従業員クリック：ターミナルドックの面へ接続（同一セッションの面があれば再利用）
-    this.scene.onEmployeeClick = async (info) => {
-      const title = {
-        empName: `${info.employee.name}（${info.department.name}）`,
-        sessionTitle: info.employee.title,
-      };
-      // 既に面が開いていればフォーカスだけ（REST不要）
-      if (this.dock.focusSession(info.employee.sessionId)) return;
-      try {
-        const { terminalId } = await openTerminal(
-          info.department.id,
-          info.employee.sessionId
-        );
-        this.dock.open(terminalId, info.employee.sessionId, title);
-      } catch (e) {
-        this.ui.showError(
-          e instanceof Error ? e.message : "ターミナルの接続に失敗しました。"
-        );
-      }
+    // 従業員クリック：詳細モーダルを開く（ターミナル接続はモーダル内のボタンから）
+    this.scene.onEmployeeClick = (info) => {
+      const note = this.latestState?.settings.employeeNotes[info.employee.sessionId] ?? "";
+      this.ui.openEmployeeModal(info.department, info.employee, note);
     };
 
     // 空席クリック：雇用確認→hire（ターミナルは演出を待たず即座に開く）
@@ -353,6 +339,28 @@ class App {
         const state = await putEmployeeNote(sessionId, note);
         this.applyStateFromRest(state);
       }
+    };
+
+    // 従業員詳細モーダルからターミナルを開く
+    this.ui.onOpenTerminal = async (dept, emp) => {
+      const title = {
+        empName: `${emp.name}（${dept.name}）`,
+        sessionTitle: emp.title,
+      };
+      if (this.dock.focusSession(emp.sessionId)) return;
+      try {
+        const { terminalId } = await openTerminal(dept.id, emp.sessionId);
+        this.dock.open(terminalId, emp.sessionId, title);
+      } catch (e) {
+        this.ui.showError(
+          e instanceof Error ? e.message : "ターミナルの接続に失敗しました。"
+        );
+      }
+    };
+
+    // 従業員詳細モーダルからSkill蒸留を実行する
+    this.ui.onDistill = async (dept, emp) => {
+      return distillSession(emp.sessionId, dept.id);
     };
 
     // リトライ：初期ロードからやり直す

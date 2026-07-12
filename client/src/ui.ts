@@ -2,7 +2,7 @@
 // ヘッダー・各種モーダル（新規プロジェクト／表示選択／OB名簿）・
 // ターミナルパネルの開閉・接続エラー表示（リトライボタン）を扱う。
 
-import type { OfficeState, Department, Employee, UsageInfo } from "../../shared/types";
+import type { OfficeState, Department, Employee, UsageInfo, DistillResult } from "../../shared/types";
 
 /** DOM要素をIDで取得（存在前提のヘルパ） */
 function byId<T extends HTMLElement = HTMLElement>(id: string): T {
@@ -34,6 +34,10 @@ export class UI {
     note: string;
     titleChanged: boolean;
   }) => Promise<void>;
+  /** 従業員詳細モーダルからターミナルを開く */
+  onOpenTerminal?: (dept: Department, emp: Employee) => void;
+  /** 従業員詳細モーダルからSkill蒸留を実行する */
+  onDistill?: (dept: Department, emp: Employee) => Promise<DistillResult>;
 
   private state: OfficeState | null = null;
 
@@ -358,6 +362,140 @@ export class UI {
         errEl.textContent = e instanceof Error ? e.message : "保存に失敗しました。";
       }
     });
+  }
+
+  // ---- 従業員詳細モーダル ----
+
+  private empTarget: { dept: Department; emp: Employee; note: string } | null = null;
+  private empModalWired = false;
+
+  openEmployeeModal(dept: Department, emp: Employee, note: string): void {
+    this.empTarget = { dept, emp, note };
+
+    byId("emp-modal-title").textContent = `${emp.name}（${dept.name}）`;
+    byId("emp-name").textContent = emp.name;
+
+    const statusMap: Record<string, string> = {
+      working: "🟢 作業中",
+      waiting: "🟡 返事待ち",
+      resting: "⚪ 休憩中",
+    };
+    byId("emp-status").textContent = statusMap[emp.status] ?? emp.status;
+    byId("emp-role").textContent = emp.title || "（未設定）";
+    byId("emp-branch").textContent = emp.gitBranch
+      ? `${emp.gitBranch}`
+      : "（不明）";
+    byId("emp-dept").textContent = dept.name;
+    byId("emp-progress").textContent = emp.progress || "（なし）";
+    byId("emp-summary").textContent = emp.summary || "（なし）";
+
+    this.openModal("modal-employee");
+    this.wireEmployeeModalButtons();
+  }
+
+  private wireEmployeeModalButtons(): void {
+    if (this.empModalWired) return;
+    this.empModalWired = true;
+
+    byId("emp-open-terminal").addEventListener("click", () => {
+      if (!this.empTarget) return;
+      this.closeModal("modal-employee");
+      this.onOpenTerminal?.(this.empTarget.dept, this.empTarget.emp);
+    });
+
+    byId("emp-open-karte").addEventListener("click", () => {
+      if (!this.empTarget) return;
+      this.closeModal("modal-employee");
+      this.openKarteModal(this.empTarget.dept, this.empTarget.emp, this.empTarget.note);
+    });
+
+    byId("emp-distill-btn").addEventListener("click", async () => {
+      if (!this.empTarget) return;
+      this.closeModal("modal-employee");
+      this.openDistillModal();
+      try {
+        const result = await this.onDistill?.(this.empTarget.dept, this.empTarget.emp);
+        if (result) this.showDistillResult(result);
+      } catch (e) {
+        const errEl = byId("distill-error");
+        errEl.textContent = e instanceof Error ? e.message : "蒸留に失敗しました。";
+        errEl.style.display = "block";
+        byId("distill-loading").style.display = "none";
+      }
+    });
+
+    byId("distill-copy-btn").addEventListener("click", () => {
+      const tmpl = byId("distill-template").textContent ?? "";
+      navigator.clipboard.writeText(tmpl).then(() => {
+        const btn = byId("distill-copy-btn");
+        const orig = btn.textContent;
+        btn.textContent = "✅ コピー完了";
+        setTimeout(() => { btn.textContent = orig; }, 1500);
+      });
+    });
+  }
+
+  private openDistillModal(): void {
+    byId("distill-loading").style.display = "block";
+    byId("distill-content").style.display = "none";
+    byId("distill-error").style.display = "none";
+    byId("distill-error").textContent = "";
+    this.openModal("modal-distill");
+  }
+
+  showDistillResult(result: DistillResult): void {
+    byId("distill-loading").style.display = "none";
+    byId("distill-content").style.display = "block";
+
+    // ツール一覧タグ（DOM操作でXSSを回避）
+    const toolsEl = byId("distill-tools");
+    toolsEl.textContent = "";
+    if (result.toolsUsed.length > 0) {
+      for (const t of result.toolsUsed) {
+        const tag = document.createElement("span");
+        tag.className = "distill-tag";
+        tag.textContent = t;
+        toolsEl.appendChild(tag);
+      }
+    } else {
+      const none = document.createElement("span");
+      none.style.color = "var(--muted)";
+      none.textContent = "（なし）";
+      toolsEl.appendChild(none);
+    }
+
+    // 参照ファイル（DOM操作）
+    const filesEl = byId("distill-files");
+    filesEl.textContent = "";
+    if (result.filesReferenced.length > 0) {
+      for (const f of result.filesReferenced) {
+        const code = document.createElement("code");
+        code.textContent = f;
+        filesEl.appendChild(code);
+        filesEl.appendChild(document.createElement("br"));
+      }
+    } else {
+      filesEl.textContent = "（なし）";
+    }
+
+    // 主要決断（DOM操作）
+    const decisionsEl = byId("distill-decisions");
+    decisionsEl.textContent = "";
+    if (result.keyDecisions.length > 0) {
+      for (const d of result.keyDecisions) {
+        const li = document.createElement("li");
+        li.textContent = d;
+        decisionsEl.appendChild(li);
+      }
+    } else {
+      const li = document.createElement("li");
+      li.style.color = "var(--muted)";
+      li.textContent = "（なし）";
+      decisionsEl.appendChild(li);
+    }
+
+    // Skillテンプレート
+    byId("distill-template").textContent = result.skillTemplate;
   }
 
   // ---- 接続エラー表示（リトライ） ----

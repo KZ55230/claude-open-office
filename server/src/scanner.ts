@@ -42,6 +42,8 @@ interface RawSession {
   title: string;
   /** 直近のassistant発言から自動抽出した進捗（現在何をしている/したか）。無ければ空文字 */
   progress: string;
+  /** セッションが動作しているgitブランチ。取得できなければ空文字 */
+  gitBranch: string;
   /** 承認待ち／完了報告の検知結果。どちらでもなければnull */
   speech: SpeechDetectionResult | null;
 }
@@ -98,6 +100,7 @@ function extractSession(filePath: string): RawSession | null {
 
   const lines = content.split("\n");
   let cwd: string | null = null;
+  let gitBranch = "";
 
   // summary候補（優先度順）:
   //  1) 末尾から遡って type:"summary" 行の summary フィールド
@@ -134,6 +137,10 @@ function extractSession(filePath: string): RawSession | null {
 
     if (!cwd && typeof obj.cwd === "string" && obj.cwd.length > 0) {
       cwd = obj.cwd;
+    }
+
+    if (!gitBranch && typeof obj.gitBranch === "string" && obj.gitBranch.length > 0) {
+      gitBranch = obj.gitBranch;
     }
 
     if (obj.type === "summary" && typeof obj.summary === "string") {
@@ -227,6 +234,7 @@ function extractSession(filePath: string): RawSession | null {
     // セッション名: custom-title（実名）優先、無ければai-title、どちらも無ければ空
     title: customTitle ?? aiTitle ?? "",
     progress,
+    gitBranch,
     speech,
   };
 
@@ -335,6 +343,7 @@ function toEmployee(
     hasLiveTerminal: hasLive,
     title: raw.title,
     progress: raw.progress,
+    gitBranch: raw.gitBranch,
   };
 }
 

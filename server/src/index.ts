@@ -25,6 +25,7 @@ import type {
   OfficeWsMessage,
   TermClientMessage,
   UsageInfo,
+  DistillResult,
 } from "../../shared/types.js";
 
 // バインド先（DESIGN.md: 127.0.0.1のみ）
@@ -264,6 +265,145 @@ app.post("/api/sessions/:sessionId/title", (req, res) => {
   res.json({ ok: true });
   // mtime変化でchokidarも発火するが、確実に反映するため明示的にも配信する
   broadcastOffice();
+});
+
+// GET /api/sessions/:sessionId/distill?departmentId=... → DistillResult
+// JONLを解析してツール使用・参照ファイル・主要決断を抽出し、Skill改善テンプレートを生成する
+app.get("/api/sessions/:sessionId/distill", (req, res) => {
+  const { sessionId } = req.params;
+  const { departmentId } = req.query;
+  if (typeof departmentId !== "string" || !departmentId) {
+    res.status(400).json({ error: "departmentId is required" });
+    return;
+  }
+  const projectsDir = path.join(
+    process.env.HOME ?? process.env.USERPROFILE ?? "",
+    ".claude",
+    "projects"
+  );
+  const jsonlPath = path.join(projectsDir, departmentId, sessionId + ".jsonl");
+  if (!fs.existsSync(jsonlPath)) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  const lines = fs.readFileSync(jsonlPath, "utf-8").split("\n").filter(Boolean);
+
+  let title = "";
+  let summary = "";
+  let gitBranch = "";
+  const toolCount: Record<string, number> = {};
+  const filesSet = new Set<string>();
+  const keyDecisions: string[] = [];
+  const FILE_TOOLS = new Set(["Read", "Edit", "Write", "Glob", "Grep", "MultiEdit"]);
+
+  for (const line of lines) {
+    let obj: Record<string, unknown>;
+    try { obj = JSON.parse(line); } catch { continue; }
+
+    // メタ情報抽出
+    if (!title && typeof obj["custom-title"] === "string" && obj["custom-title"]) {
+      title = obj["custom-title"] as string;
+    }
+    if (!title && typeof obj["ai-title"] === "string" && obj["ai-title"]) {
+      title = obj["ai-title"] as string;
+    }
+    if (!summary && typeof obj.summary === "string" && obj.summary) {
+      summary = obj.summary as string;
+    }
+    if (!gitBranch && typeof obj.gitBranch === "string" && obj.gitBranch) {
+      gitBranch = obj.gitBranch as string;
+    }
+
+    // assistantメッセージからツール使用とテキスト抽出
+    if (obj.type === "assistant" && Array.isArray(obj.content)) {
+      for (const block of obj.content as unknown[]) {
+        const b = block as Record<string, unknown>;
+        if (b.type === "tool_use" && typeof b.name === "string") {
+          const toolName = b.name as string;
+          toolCount[toolName] = (toolCount[toolName] ?? 0) + 1;
+
+          // ファイル参照パスの抽出
+          if (FILE_TOOLS.has(toolName) && b.input && typeof b.input === "object") {
+            const inp = b.input as Record<string, unknown>;
+            const fp = inp.file_path ?? inp.path ?? inp.pattern ?? inp.glob;
+            if (typeof fp === "string" && fp.length > 0) {
+              filesSet.add(fp);
+            }
+          }
+        }
+        if (b.type === "text" && typeof b.text === "string") {
+          const text = (b.text as string).trim();
+          // 意味のある長さのテキストのみ（短すぎ・長すぎを除く）
+          if (text.length > 80 && text.length < 800) {
+            keyDecisions.push(text);
+          }
+        }
+      }
+    }
+  }
+
+  // ツール使用頻度順ソート
+  const toolsUsed = Object.entries(toolCount)
+    .sort((a, b) => b[1] - a[1])
+    .map(([name]) => name);
+
+  const filesReferenced = [...filesSet].slice(0, 20);
+
+  // key decisions: 後半のものが有益なことが多い → 末尾3件
+  const topDecisions = keyDecisions.slice(-3).map((t) => t.slice(0, 200));
+
+  // Skill改善テンプレートMarkdown生成
+  const toolsLine = toolsUsed.slice(0, 8).join(", ") || "（なし）";
+  const filesLine = filesReferenced
+    .slice(0, 5)
+    .map((f) => `- \`${f}\``)
+    .join("\n") || "- （なし）";
+  const decisionsLine = topDecisions
+    .map((d, i) => `${i + 1}. ${d.replace(/\n/g, " ")}`)
+    .join("\n") || "（なし）";
+
+  const skillTemplate = `## セッション蒸留: ${title || sessionId}
+
+**ブランチ**: \`${gitBranch || "不明"}\`
+**概要**: ${summary || "（要約なし）"}
+
+### 使用ツール（頻度順）
+${toolsLine}
+
+### 主な参照ファイル
+${filesLine}
+
+### 注目の判断・発言
+${decisionsLine}
+
+### Skillsへの提案（ここを .claude/skills/ のファイルに貼り付けてください）
+
+\`\`\`markdown
+## パターン: <!-- パターン名を記入 -->
+
+**いつ使う**: <!-- 適用条件 -->
+
+**手順**:
+1. <!-- 手順1 -->
+2. <!-- 手順2 -->
+
+**参考**: ${title || sessionId} (${gitBranch || ""})
+\`\`\`
+`;
+
+  const result: DistillResult = {
+    sessionId,
+    title: title || "",
+    gitBranch: gitBranch || "",
+    summary: summary || "",
+    toolsUsed,
+    filesReferenced,
+    keyDecisions: topDecisions,
+    skillTemplate,
+  };
+
+  res.json(result);
 });
 
 // production時は dist/（viteビルド成果物）を静的配信する

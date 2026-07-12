@@ -447,6 +447,102 @@
         pointer-events: none;
       }
 
+      /* ---- 従業員詳細モーダル ---- */
+      .emp-meta {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 4px 12px;
+        font-size: 12px;
+        margin-bottom: 12px;
+      }
+      .emp-meta .label {
+        color: var(--muted);
+      }
+      .emp-meta .value {
+        color: var(--text);
+        word-break: break-all;
+      }
+      .emp-summary {
+        font-size: 12px;
+        color: var(--text);
+        background: #14141c;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 8px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        max-height: 120px;
+        overflow: auto;
+        margin-bottom: 12px;
+      }
+
+      /* ---- Skill蒸留モーダル ---- */
+      .distill-section {
+        margin-bottom: 14px;
+      }
+      .distill-section h3 {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 0 0 6px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 4px;
+      }
+      .distill-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      .distill-tag {
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        padding: 2px 7px;
+        font-size: 11px;
+        color: var(--accent-yellow);
+      }
+      .distill-files {
+        font-size: 11px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+      .distill-files code {
+        color: var(--accent);
+        background: #14141c;
+        padding: 0 3px;
+        border-radius: 2px;
+      }
+      .distill-decisions {
+        font-size: 11px;
+        color: var(--text);
+        line-height: 1.6;
+      }
+      .distill-decisions li {
+        margin-bottom: 6px;
+        word-break: break-word;
+      }
+      .distill-template {
+        background: #0e0e16;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 10px;
+        font-size: 11px;
+        color: var(--muted);
+        white-space: pre-wrap;
+        word-break: break-word;
+        max-height: 220px;
+        overflow: auto;
+        font-family: inherit;
+      }
+      #distill-copy-btn {
+        margin-top: 6px;
+      }
+      #distill-loading {
+        text-align: center;
+        padding: 20px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
       /* 模様替えボタンのアクティブ表示 */
       #btn-rearrange.active {
         background: #274232;
@@ -636,6 +732,70 @@
           <div class="modal-actions">
             <button class="btn" data-close="modal-karte">キャンセル</button>
             <button class="btn" id="karte-save">保存する</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 従業員詳細モーダル（キャラクタークリック） -->
+      <div class="modal" id="modal-employee" style="min-width:400px">
+        <div class="modal-head">
+          <h2 id="emp-modal-title">従業員詳細</h2>
+          <span class="spacer"></span>
+          <button class="close-x" data-close="modal-employee">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="emp-meta" id="emp-meta-grid">
+            <span class="label">名前</span><span class="value" id="emp-name"></span>
+            <span class="label">ステータス</span><span class="value" id="emp-status"></span>
+            <span class="label">ロール</span><span class="value" id="emp-role"></span>
+            <span class="label">ブランチ</span><span class="value" id="emp-branch"></span>
+            <span class="label">部署</span><span class="value" id="emp-dept"></span>
+            <span class="label">進捗</span><span class="value" id="emp-progress"></span>
+          </div>
+          <div class="distill-section">
+            <h3>直近のサマリー</h3>
+            <div class="emp-summary" id="emp-summary">（なし）</div>
+          </div>
+          <div class="modal-actions">
+            <button class="btn" data-close="modal-employee">閉じる</button>
+            <button class="btn" id="emp-open-karte">カルテ編集</button>
+            <button class="btn" id="emp-open-terminal">ターミナルへ</button>
+            <button class="btn" id="emp-distill-btn">Skill蒸留 ✦</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Skill蒸留結果モーダル -->
+      <div class="modal" id="modal-distill" style="min-width:480px">
+        <div class="modal-head">
+          <h2>✦ Skill蒸留結果</h2>
+          <span class="spacer"></span>
+          <button class="close-x" data-close="modal-distill">✕</button>
+        </div>
+        <div class="modal-body">
+          <div id="distill-loading">解析中…</div>
+          <div id="distill-content" style="display:none">
+            <div class="distill-section">
+              <h3>使用ツール（頻度順）</h3>
+              <div class="distill-tags" id="distill-tools"></div>
+            </div>
+            <div class="distill-section">
+              <h3>主な参照ファイル</h3>
+              <div class="distill-files" id="distill-files"></div>
+            </div>
+            <div class="distill-section">
+              <h3>注目の判断・発言</h3>
+              <ol class="distill-decisions" id="distill-decisions"></ol>
+            </div>
+            <div class="distill-section">
+              <h3>.claude/skills/ への提案テンプレート</h3>
+              <pre class="distill-template" id="distill-template"></pre>
+              <button class="btn btn-small" id="distill-copy-btn">📋 コピー</button>
+            </div>
+          </div>
+          <div class="error-text" id="distill-error" style="display:none"></div>
+          <div class="modal-actions">
+            <button class="btn" data-close="modal-distill">閉じる</button>
           </div>
         </div>
       </div>

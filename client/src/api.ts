@@ -10,6 +10,7 @@ import type {
   TermClientMessage,
   EmployeeStatus,
   UsageInfo,
+  DistillResult,
 } from "../../shared/types";
 
 /** WSのstatusパッチ1件分（契約のOfficeWsMessage type:"status" のupdates要素） */
@@ -156,6 +157,19 @@ export function renameSession(
       method: "POST",
       body: JSON.stringify({ departmentId, title }),
     }
+  );
+}
+
+/**
+ * GET /api/sessions/:sessionId/distill?departmentId=...
+ * セッションのJSONLを解析してSkill改善候補を返す
+ */
+export function distillSession(
+  sessionId: string,
+  departmentId: string
+): Promise<DistillResult> {
+  return fetchJson<DistillResult>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/distill?departmentId=${encodeURIComponent(departmentId)}`
   );
 }
 

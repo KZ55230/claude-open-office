@@ -98,6 +98,9 @@ interface SeatView {
   charSprite: Sprite;
   badge: Graphics;
   zzz: Text;
+  /** ロール表示ラベル（スプライト上部の背景付きテキスト） */
+  roleLabel: Container;
+  roleLabelText: Text;
   facing: "down" | "up";
   animPhase: number;
   homeX: number; // charSpriteのローカル基準位置
@@ -1154,6 +1157,32 @@ export class OfficeScene {
     zzz.visible = emp.status === "resting";
     container.addChild(zzz);
 
+    // ロールラベル（スプライト上部の背景付きテキスト）
+    const roleLabel = new Container();
+    const rawTitle = emp.title || "";
+    const truncTitle = rawTitle.length > 14 ? rawTitle.slice(0, 13) + "…" : rawTitle;
+    const roleLabelText = crispText(truncTitle, {
+      fontSize: 4.5,
+      fill: 0xfdf4c2,
+      fontFamily: "monospace",
+    });
+    const LABEL_PAD_X = 1.5;
+    const LABEL_PAD_Y = 1;
+    const labelW = roleLabelText.width + LABEL_PAD_X * 2;
+    const labelH = roleLabelText.height + LABEL_PAD_Y * 2;
+    const roleLabelBg = new Graphics();
+    roleLabelBg
+      .roundRect(-labelW / 2, -labelH / 2, labelW, labelH, 1.5)
+      .fill({ color: 0x1a1a2e, alpha: 0.82 });
+    roleLabelText.x = -roleLabelText.width / 2;
+    roleLabelText.y = -roleLabelText.height / 2;
+    roleLabel.addChild(roleLabelBg);
+    roleLabel.addChild(roleLabelText);
+    roleLabel.x = TILE / 2;
+    roleLabel.y = -TILE * 1.15;
+    roleLabel.visible = rawTitle.length > 0;
+    container.addChild(roleLabel);
+
     const seat: SeatView = {
       employee: emp,
       seatIdx,
@@ -1161,6 +1190,8 @@ export class OfficeScene {
       charSprite: char,
       badge,
       zzz,
+      roleLabel,
+      roleLabelText,
       facing,
       animPhase: Math.random() * Math.PI * 2,
       homeX: 0,
@@ -1224,7 +1255,7 @@ export class OfficeScene {
     }
   }
 
-  /** 席のステータス表示（バッジ色・Zzz）を更新 */
+  /** 席のステータス表示（バッジ色・Zzz・ロールラベル）を更新 */
   private refreshSeatStatus(seat: SeatView): void {
     const st = seat.employee.status;
     seat.badge.clear();
@@ -1238,6 +1269,23 @@ export class OfficeScene {
         st === "resting"
       );
     }
+    // ロールラベルのテキストと背景・表示状態を更新
+    const rawTitle = seat.employee.title || "";
+    const truncTitle = rawTitle.length > 14 ? rawTitle.slice(0, 13) + "…" : rawTitle;
+    seat.roleLabelText.text = truncTitle;
+    // テキストサイズが変わった場合に備えて背景を再描画
+    const bg = seat.roleLabel.children[0] as Graphics;
+    if (bg instanceof Graphics) {
+      const LABEL_PAD_X = 1.5;
+      const LABEL_PAD_Y = 1;
+      const lw = seat.roleLabelText.width + LABEL_PAD_X * 2;
+      const lh = seat.roleLabelText.height + LABEL_PAD_Y * 2;
+      bg.clear();
+      bg.roundRect(-lw / 2, -lh / 2, lw, lh, 1.5).fill({ color: 0x1a1a2e, alpha: 0.82 });
+      seat.roleLabelText.x = -seat.roleLabelText.width / 2;
+      seat.roleLabelText.y = -seat.roleLabelText.height / 2;
+    }
+    seat.roleLabel.visible = rawTitle.length > 0;
   }
 
   /** 承認待ち・完了報告の吹き出しを表示する（外部＝main.tsから呼ばれる） */
